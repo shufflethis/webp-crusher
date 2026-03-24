@@ -385,6 +385,10 @@ function handleFiles(newFiles) {
   convertedBlobs = new Array(files.length).fill(null);
   totalOriginalSize = files.reduce((s, f) => s + f.size, 0);
   totalCompressedSize = 0;
+  document.getElementById('btnConvert').disabled = false;
+  document.getElementById('btnDownload').disabled = true;
+  document.getElementById('progressWrap').classList.remove('active');
+  document.getElementById('progressBar').style.width = '0%';
   updateUI();
 }
 
