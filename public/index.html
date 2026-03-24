@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WebP Crusher – Batch Image Converter</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&family=DM+Sans:wght@400;500;700&display=swap');
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --surface2: #1a1a26;
+    --border: #2a2a3a;
+    --accent: #00e68a;
+    --accent2: #00b8ff;
+    --danger: #ff4466;
+    --text: #e8e8f0;
+    --text-dim: #6a6a80;
+    --radius: 12px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  .noise {
+    position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  .container {
+    position: relative; z-index: 1;
+    max-width: 960px; margin: 0 auto; padding: 40px 24px;
+  }
+
+  header {
+    text-align: center; margin-bottom: 40px;
+  }
+
+  header h1 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 2.4rem; font-weight: 800;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    letter-spacing: -1px;
+  }
+
+  header p {
+    color: var(--text-dim); margin-top: 8px; font-size: 0.95rem;
+  }
+
+  header .badge {
+    display: inline-block; margin-top: 12px;
+    font-family: 'JetBrains Mono', monospace; font-size: 0.75rem;
+    background: var(--surface2); border: 1px solid var(--border);
+    padding: 4px 14px; border-radius: 99px; color: var(--accent);
+  }
+
+  /* Drop Zone */
+  .dropzone {
+    position: relative;
+    border: 2px dashed var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    padding: 60px 40px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+  }
+
+  .dropzone:hover, .dropzone.dragover {
+    border-color: var(--accent);
+    background: rgba(0, 230, 138, 0.03);
+    box-shadow: 0 0 40px rgba(0, 230, 138, 0.05);
+  }
+
+  .dropzone .icon {
+    font-size: 3rem; margin-bottom: 16px;
+    filter: grayscale(0.3);
+  }
+
+  .dropzone h2 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.1rem; font-weight: 700; margin-bottom: 8px;
+  }
+
+  .dropzone span {
+    color: var(--text-dim); font-size: 0.85rem;
+  }
+
+  .dropzone input[type="file"] {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer;
+  }
+
+  /* Stats Bar */
+  .stats {
+    display: flex; gap: 16px; margin-top: 24px; flex-wrap: wrap;
+  }
+
+  .stat-card {
+    flex: 1; min-width: 140px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 16px 20px;
+  }
+
+  .stat-card .label {
+    font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px;
+    color: var(--text-dim); font-family: 'JetBrains Mono', monospace;
+  }
+
+  .stat-card .value {
+    font-size: 1.5rem; font-weight: 700; margin-top: 4px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .stat-card .value.green { color: var(--accent); }
+  .stat-card .value.blue { color: var(--accent2); }
+
+  /* Controls */
+  .controls {
+    display: flex; gap: 12px; margin-top: 24px; flex-wrap: wrap;
+  }
+
+  .btn {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85rem; font-weight: 700;
+    padding: 14px 28px; border: none; border-radius: var(--radius);
+    cursor: pointer; transition: all 0.2s ease;
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+
+  .btn:disabled {
+    opacity: 0.3; cursor: not-allowed;
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, var(--accent), #00cc7a);
+    color: #000;
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 20px rgba(0, 230, 138, 0.3);
+  }
+
+  .btn-download {
+    background: linear-gradient(135deg, var(--accent2), #0090cc);
+    color: #fff;
+  }
+
+  .btn-download:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 20px rgba(0, 184, 255, 0.3);
+  }
+
+  .btn-danger {
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--danger);
+  }
+
+  .btn-danger:hover:not(:disabled) {
+    background: rgba(255, 68, 102, 0.1);
+    border-color: var(--danger);
+  }
+
+  /* Progress */
+  .progress-wrap {
+    margin-top: 24px; display: none;
+  }
+
+  .progress-wrap.active { display: block; }
+
+  .progress-bar-outer {
+    width: 100%; height: 6px; background: var(--surface2);
+    border-radius: 99px; overflow: hidden;
+  }
+
+  .progress-bar-inner {
+    height: 100%; width: 0%; border-radius: 99px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    transition: width 0.3s ease;
+  }
+
+  .progress-text {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem; color: var(--text-dim);
+    margin-top: 8px; text-align: center;
+  }
+
+  /* File List */
+  .file-list {
+    margin-top: 24px;
+    display: grid; gap: 6px;
+    max-height: 50vh; overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+
+  .file-item {
+    display: grid;
+    grid-template-columns: 48px 1fr auto auto auto;
+    align-items: center; gap: 12px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 16px;
+    font-size: 0.82rem;
+    transition: border-color 0.2s;
+  }
+
+  .file-item.done { border-color: rgba(0, 230, 138, 0.2); }
+  .file-item.error { border-color: rgba(255, 68, 102, 0.3); }
+
+  .file-thumb {
+    width: 48px; height: 36px; object-fit: cover;
+    border-radius: 4px; background: var(--surface2);
+  }
+
+  .file-name {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+
+  .file-size {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem; color: var(--text-dim);
+    white-space: nowrap;
+  }
+
+  .file-saved {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem; color: var(--accent); font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .file-status {
+    width: 20px; text-align: center;
+  }
+
+  .spinner {
+    display: inline-block; width: 14px; height: 14px;
+    border: 2px solid var(--border); border-top-color: var(--accent);
+    border-radius: 50%; animation: spin 0.6s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Settings */
+  .settings {
+    margin-top: 24px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 20px;
+    display: flex; gap: 24px; align-items: center; flex-wrap: wrap;
+  }
+
+  .setting-group label {
+    font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px;
+    color: var(--text-dim); font-family: 'JetBrains Mono', monospace;
+    display: block; margin-bottom: 6px;
+  }
+
+  .setting-group input[type="number"],
+  .setting-group select {
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85rem; padding: 8px 12px; border-radius: 6px;
+    width: 120px;
+  }
+
+  @media (max-width: 600px) {
+    header h1 { font-size: 1.6rem; }
+    .dropzone { padding: 40px 20px; }
+    .file-item { grid-template-columns: 1fr auto; gap: 8px; }
+    .file-thumb, .file-saved { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="noise"></div>
+<div class="container">
+  <header>
+    <h1>WebP Crusher</h1>
+    <p>Batch-Konvertierung zu WebP &middot; Komprimiert auf &le;100 KB &middot; ZIP-Download</p>
+    <div class="badge">max 50 Bilder &middot; client-side &middot; kein Upload</div>
+  </header>
+
+  <div class="settings">
+    <div class="setting-group">
+      <label>Max Dateigr&ouml;&szlig;e (KB)</label>
+      <input type="number" id="maxKb" value="100" min="10" max="1000" step="10">
+    </div>
+    <div class="setting-group">
+      <label>Max Breite (px)</label>
+      <input type="number" id="maxWidth" value="1920" min="200" max="4000" step="100">
+    </div>
+    <div class="setting-group">
+      <label>Prefix</label>
+      <input type="text" id="prefix" value="" placeholder="optional" style="width:100px;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:'JetBrains Mono',monospace;font-size:0.85rem;padding:8px 12px;border-radius:6px;">
+    </div>
+  </div>
+
+  <div class="dropzone" id="dropzone">
+    <div class="icon">&#128194;</div>
+    <h2>Bilder hierher ziehen</h2>
+    <span>oder klicken &middot; JPG, PNG, GIF, BMP, TIFF, WebP &middot; max 50 St&uuml;ck</span>
+    <input type="file" id="fileInput" multiple accept="image/*">
+  </div>
+
+  <div class="stats" id="stats" style="display:none;">
+    <div class="stat-card">
+      <div class="label">Bilder</div>
+      <div class="value" id="statCount">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Original</div>
+      <div class="value blue" id="statOriginal">0 MB</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Komprimiert</div>
+      <div class="value green" id="statCompressed">&ndash;</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Gespart</div>
+      <div class="value green" id="statSaved">&ndash;</div>
+    </div>
+  </div>
+
+  <div class="controls" id="controls" style="display:none;">
+    <button class="btn btn-primary" id="btnConvert" onclick="startConversion()">&#9889; Konvertieren</button>
+    <button class="btn btn-download" id="btnDownload" onclick="downloadZip()" disabled>&#128230; ZIP Download</button>
+    <button class="btn btn-danger" onclick="resetAll()">&#10005; Reset</button>
+  </div>
+
+  <div class="progress-wrap" id="progressWrap">
+    <div class="progress-bar-outer">
+      <div class="progress-bar-inner" id="progressBar"></div>
+    </div>
+    <div class="progress-text" id="progressText">0 / 0</div>
+  </div>
+
+  <div class="file-list" id="fileList"></div>
+</div>
+
+<script>
+const MAX_FILES = 50;
+let files = [];
+let convertedBlobs = [];
+let totalOriginalSize = 0;
+let totalCompressedSize = 0;
+
+const dropzone = document.getElementById('dropzone');
+const fileInput = document.getElementById('fileInput');
+
+['dragenter','dragover'].forEach(e => {
+  dropzone.addEventListener(e, ev => { ev.preventDefault(); dropzone.classList.add('dragover'); });
+});
+['dragleave','drop'].forEach(e => {
+  dropzone.addEventListener(e, ev => { ev.preventDefault(); dropzone.classList.remove('dragover'); });
+});
+
+dropzone.addEventListener('drop', ev => {
+  const dt = ev.dataTransfer;
+  if (dt.files) handleFiles(dt.files);
+});
+
+fileInput.addEventListener('change', ev => {
+  if (ev.target.files) handleFiles(ev.target.files);
+});
+
+function handleFiles(newFiles) {
+  const arr = Array.from(newFiles).filter(f => f.type.startsWith('image/'));
+  const space = MAX_FILES - files.length;
+  const toAdd = arr.slice(0, space);
+  if (arr.length > space) {
+    alert('Nur ' + MAX_FILES + ' Bilder erlaubt. ' + (arr.length - space) + ' wurden ignoriert.');
+  }
+  files.push(...toAdd);
+  convertedBlobs = new Array(files.length).fill(null);
+  totalOriginalSize = files.reduce((s, f) => s + f.size, 0);
+  totalCompressedSize = 0;
+  updateUI();
+}
+
+function updateUI() {
+  document.getElementById('stats').style.display = files.length ? 'flex' : 'none';
+  document.getElementById('controls').style.display = files.length ? 'flex' : 'none';
+  document.getElementById('statCount').textContent = files.length;
+  document.getElementById('statOriginal').textContent = formatSize(totalOriginalSize);
+
+  const list = document.getElementById('fileList');
+  list.innerHTML = '';
+  files.forEach((f, i) => {
+    const item = document.createElement('div');
+    item.className = 'file-item';
+    item.id = 'file-' + i;
+
+    const thumb = document.createElement('img');
+    thumb.className = 'file-thumb';
+    thumb.src = URL.createObjectURL(f);
+
+    const name = document.createElement('div');
+    name.className = 'file-name';
+    name.textContent = f.name;
+
+    const size = document.createElement('div');
+    size.className = 'file-size';
+    size.textContent = formatSize(f.size);
+
+    const saved = document.createElement('div');
+    saved.className = 'file-saved';
+    saved.id = 'saved-' + i;
+
+    const status = document.createElement('div');
+    status.className = 'file-status';
+    status.id = 'status-' + i;
+    status.textContent = '\u23F3';
+
+    item.append(thumb, name, size, saved, status);
+    list.appendChild(item);
+  });
+}
+
+async function startConversion() {
+  const btnConvert = document.getElementById('btnConvert');
+  const btnDownload = document.getElementById('btnDownload');
+  btnConvert.disabled = true;
+  btnDownload.disabled = true;
+  document.getElementById('progressWrap').classList.add('active');
+  totalCompressedSize = 0;
+
+  const maxKb = parseInt(document.getElementById('maxKb').value) || 100;
+  const maxBytes = maxKb * 1024;
+  const maxW = parseInt(document.getElementById('maxWidth').value) || 1920;
+
+  for (let i = 0; i < files.length; i++) {
+    const statusEl = document.getElementById('status-' + i);
+    const savedEl = document.getElementById('saved-' + i);
+    const itemEl = document.getElementById('file-' + i);
+    statusEl.innerHTML = '<div class="spinner"></div>';
+
+    try {
+      const blob = await compressToWebP(files[i], maxBytes, maxW);
+      convertedBlobs[i] = blob;
+      totalCompressedSize += blob.size;
+      statusEl.textContent = '\u2705';
+      itemEl.classList.add('done');
+
+      const pct = ((1 - blob.size / files[i].size) * 100).toFixed(0);
+      savedEl.textContent = formatSize(blob.size) + ' (\u2212' + pct + '%)';
+    } catch (err) {
+      statusEl.textContent = '\u274C';
+      itemEl.classList.add('error');
+      savedEl.textContent = 'Fehler';
+      console.error('Fehler bei ' + files[i].name + ':', err);
+    }
+
+    updateProgress(i + 1, files.length);
+  }
+
+  document.getElementById('statCompressed').textContent = formatSize(totalCompressedSize);
+  var savedPct = totalOriginalSize > 0 ? ((1 - totalCompressedSize / totalOriginalSize) * 100).toFixed(1) : 0;
+  document.getElementById('statSaved').textContent = savedPct + '%';
+  btnDownload.disabled = false;
+}
+
+function compressToWebP(file, maxBytes, maxW) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      let w = img.width, h = img.height;
+      if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+
+      let lo = 0.05, hi = 0.92, bestBlob = null;
+
+      canvas.toBlob(blob => {
+        if (!blob) return reject(new Error('Canvas toBlob failed'));
+        if (blob.size <= maxBytes) { resolve(blob); return; }
+
+        const tryQuality = (attempts) => {
+          if (attempts <= 0 || hi - lo < 0.02) {
+            if (bestBlob && bestBlob.size <= maxBytes) {
+              resolve(bestBlob);
+            } else {
+              scaleDown(canvas, ctx, img, w, h, maxBytes, resolve, reject);
+            }
+            return;
+          }
+          var mid = (lo + hi) / 2;
+          canvas.toBlob(b => {
+            if (!b) return reject(new Error('toBlob failed'));
+            if (b.size <= maxBytes) {
+              bestBlob = b;
+              lo = mid;
+            } else {
+              hi = mid;
+            }
+            tryQuality(attempts - 1);
+          }, 'image/webp', mid);
+        };
+        tryQuality(12);
+      }, 'image/webp', 0.92);
+
+      URL.revokeObjectURL(img.src);
+    };
+    img.onerror = () => reject(new Error('Image load failed'));
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+function scaleDown(canvas, ctx, img, w, h, maxBytes, resolve, reject) {
+  let scale = 0.9;
+  const attempt = () => {
+    const nw = Math.round(w * scale), nh = Math.round(h * scale);
+    if (nw < 50 || nh < 50) {
+      canvas.width = nw; canvas.height = nh;
+      ctx.drawImage(img, 0, 0, nw, nh);
+      canvas.toBlob(b => b ? resolve(b) : reject(new Error('final fail')), 'image/webp', 0.1);
+      return;
+    }
+    canvas.width = nw; canvas.height = nh;
+    ctx.drawImage(img, 0, 0, nw, nh);
+    canvas.toBlob(b => {
+      if (b && b.size <= maxBytes) { resolve(b); return; }
+      scale -= 0.1;
+      attempt();
+    }, 'image/webp', 0.5);
+  };
+  attempt();
+}
+
+async function downloadZip() {
+  const zip = new JSZip();
+  const prefix = document.getElementById('prefix').value.trim();
+  const folder = zip.folder('webp-images');
+
+  convertedBlobs.forEach((blob, i) => {
+    if (!blob) return;
+    const origName = files[i].name.replace(/\.[^.]+$/, '');
+    const name = prefix ? prefix + '_' + origName + '.webp' : origName + '.webp';
+    folder.file(name, blob);
+  });
+
+  const content = await zip.generateAsync({ type: 'blob' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(content);
+  a.download = 'webp-images-' + Date.now() + '.zip';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function resetAll() {
+  files = [];
+  convertedBlobs = [];
+  totalOriginalSize = 0;
+  totalCompressedSize = 0;
+  document.getElementById('fileList').innerHTML = '';
+  document.getElementById('stats').style.display = 'none';
+  document.getElementById('controls').style.display = 'none';
+  document.getElementById('progressWrap').classList.remove('active');
+  document.getElementById('progressBar').style.width = '0%';
+  document.getElementById('btnConvert').disabled = false;
+  document.getElementById('btnDownload').disabled = true;
+  document.getElementById('statCompressed').textContent = '\u2013';
+  document.getElementById('statSaved').textContent = '\u2013';
+  fileInput.value = '';
+}
+
+function updateProgress(current, total) {
+  var pct = (current / total * 100).toFixed(0);
+  document.getElementById('progressBar').style.width = pct + '%';
+  document.getElementById('progressText').textContent = current + ' / ' + total;
+}
+
+function formatSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / 1048576).toFixed(2) + ' MB';
+}
+</script>
+</body>
+</html>
