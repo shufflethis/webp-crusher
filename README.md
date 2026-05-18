@@ -87,7 +87,8 @@ webp-crusher does **not upload your images**. There is no server-side processing
 - Files are read with the browser `File` API and processed entirely in memory.
 - Conversion happens on a local `<canvas>` element.
 - The ZIP is assembled in the browser and offered as a direct download.
-- The only external request is loading the JSZip library from a CDN. To run fully offline, vendor JSZip locally (see [Self-hosting JSZip](#self-hosting-jszip)).
+- Fonts are self-hosted (bundled in `public/fonts/`) — no Google Fonts request, no third-party tracking.
+- The only external request is loading the JSZip library from a CDN, pinned with a Subresource Integrity hash. To run fully offline, vendor JSZip locally (see [Self-hosting JSZip](#self-hosting-jszip)).
 
 This makes the tool safe for confidential, unpublished, or client-owned assets.
 
@@ -146,7 +147,8 @@ Requires a browser with `canvas.toBlob()` WebP encoding support — all current 
 ```text
 public/
   index.html        The entire application — UI, styles, and conversion logic.
-vercel.json         Zero-build static deploy config (output dir + cache headers).
+  fonts/            Self-hosted woff2 fonts (DM Sans, JetBrains Mono).
+vercel.json         Zero-build static deploy config: cache + security headers (CSP, etc.).
 package.json        Dev script (npx serve) and no-op build script.
 .gitignore          node_modules, .vercel, .DS_Store.
 LICENSE             MIT.
