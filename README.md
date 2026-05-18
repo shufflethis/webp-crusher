@@ -2,11 +2,14 @@
 
 > Browser-based batch image compressor. Convert up to 50 images to **WebP**, force every file **under a target size** (default 100 KB), and download the result as a ZIP — **without uploading a single byte**.
 
+[![Live demo](https://img.shields.io/badge/live%20demo-webp--crusher.vercel.app-00e68a)](https://webp-crusher.vercel.app/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Build: none](https://img.shields.io/badge/build-zero--config-brightgreen)](#quick-start)
 [![Privacy: client-side](https://img.shields.io/badge/privacy-100%25%20client--side-00e68a)](#privacy)
 [![Deploy: Vercel](https://img.shields.io/badge/deploy-Vercel%20%2F%20VPS%20%2F%20local-black)](#deployment)
 [![Ko-fi](https://img.shields.io/badge/support-Ko--fi-ff5e5b)](https://ko-fi.com/a2amcp)
+
+**Live demo: [webp-crusher.vercel.app](https://webp-crusher.vercel.app/)** &nbsp;·&nbsp; UI is currently in German.
 
 ## What this is
 
@@ -94,7 +97,7 @@ webp-crusher is a static site and runs anywhere static files can be served.
 
 ### Vercel
 
-The repo ships a `vercel.json` configured for a zero-build static deploy (output directory `public/`, one-hour `Cache-Control`). Import the repo in Vercel, or:
+The repo ships a `vercel.json` configured for a zero-build static deploy (output directory `public/`, one-hour `Cache-Control`). The [live demo](https://webp-crusher.vercel.app/) runs exactly this setup. Import the repo in Vercel, or:
 
 ```bash
 npm i -g vercel
